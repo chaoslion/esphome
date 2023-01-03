@@ -1,0 +1,59 @@
+esphome:
+  name: name
+  platform: ESP32
+  board: nodemcu-32s
+  includes:
+    - src/desk/grove_sensor.h
+  libraries:
+    - "Grove Ultrasonic Ranger"
+
+logger:
+  # level: INFO
+
+api:
+  password: ""
+
+ota:
+  safe_mode: false
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+  fast_connect: true
+
+# deep_sleep:
+#   run_duration: 30s
+#   sleep_duration: 30s
+
+sensor:
+  - platform: custom
+    lambda: |-
+      auto sensor = new GroveUltraSonic(1000, 5);
+      App.register_component(sensor);
+      return {sensor};
+    sensors:
+      name: distance
+      unit_of_measurement: cm
+      filters:
+        - sliding_window_moving_average:
+            window_size: 15
+            send_every: 15
+      id: sensor_distance
+  
+text_sensor:
+  - platform: template
+    name: position
+    lambda: |-
+      auto position = id(sensor_distance).state;
+
+      if (position < 65)
+      {
+        return {"down"};
+      }
+      else if (position > 123)
+      {
+        return{"up"};
+      }
+      return {"inbetween"};
+    update_interval: 15s
+  
