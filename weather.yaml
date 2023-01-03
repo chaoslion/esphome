@@ -1,0 +1,143 @@
+esphome:
+  name: weather
+
+esp32:
+  board: sparkfun_esp32micromod
+  variant: ESP32
+  framework:
+    type: arduino
+    version: 2.0.5
+    platform_version: 5.2.0
+
+logger:
+  # level: INFO
+
+api:
+  password: ""
+
+ota:
+  safe_mode: false
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+  fast_connect: true
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: false
+
+deep_sleep:
+  run_duration: 30s
+  sleep_duration: 5min
+
+sensor:
+
+  - name: Rain
+    platform: pulse_counter
+    pin: GPIO27
+    unit_of_measurement: mm/h
+    update_interval: 10s
+    filters:
+      - multiply: 0.2794
+      - multiply: 60
+      - multiply: 0.001
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 3
+  
+  - name: Wind Speed
+    platform: pulse_counter
+    pin: GPIO14
+    unit_of_measurement: km/h
+    count_mode: 
+      rising_edge: DISABLE
+      falling_edge: INCREMENT
+    update_interval: 10s
+    filters:
+      - multiply: 0.04
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 3
+
+  - name: Wind Direction
+    platform: adc
+    pin: GPIO35
+    attenuation: auto
+    update_interval: 10s
+    unit_of_measurement: °
+    filters:
+      - lambda: |-
+          static float buckets[16] = {
+            0.27,
+            0.30,
+            0.41,
+            0.60,
+            0.79,
+            0.93,
+            1.30,
+            1.50,
+            1.94,
+            2.04,
+            2.27,
+            2.50,
+            2.66,
+            2.84,
+            3.02,
+            3.30,
+          };
+          static uint8_t offsets[16] = {
+            5,
+            3,
+            4,
+            7,
+            6,
+            9,
+            8,
+            1,
+            2,
+            11,
+            10,
+            15,
+            0,
+            13,
+            14,
+            12
+          };
+
+          for(auto i=0; i<16;++i)
+          {
+            if(x < buckets[i])
+            {
+              return 22.5 * offsets[i];
+            }
+          }
+
+          return -1;
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 3
+
+  - platform: bme280
+    temperature:
+      name: "BME280 Temperature"
+      oversampling: 16x
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 3
+    pressure:
+      name: "BME280 Pressure"
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 3
+    humidity:
+      name: "BME280 Humidity"
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 3
+    address: 0x77
+    update_interval: 10s
